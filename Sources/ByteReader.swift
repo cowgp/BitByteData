@@ -17,6 +17,8 @@ public class ByteReader {
     /// Offset to the byte in `data` which will be read next.
     public var offset: Int
 
+    var ptr: UnsafePointer<UInt8>
+
     /**
      True, if `offset` points at any position after the last byte in `data`.
 
@@ -33,14 +35,15 @@ public class ByteReader {
 
     /// Amount of bytes that were already read.
     public var bytesRead: Int {
-        return self.offset - self.data.startIndex
+        return self.offset
     }
 
     /// Creates an instance for reading bytes from `data`.
     public init(data: Data) {
         self.size = data.count
         self.data = data
-        self.offset = data.startIndex
+        self.offset = 0
+        self.ptr = (data as NSData).bytes.assumingMemoryBound(to: UInt8.self)
     }
 
     /**
@@ -51,7 +54,7 @@ public class ByteReader {
     public func byte() -> UInt8 {
         precondition(self.offset < self.data.endIndex)
         defer { self.offset += 1 }
-        return self.data[self.offset]
+        return self.ptr[self.offset]
     }
 
     /**
@@ -63,8 +66,13 @@ public class ByteReader {
     public func bytes(count: Int) -> [UInt8] {
         precondition(count >= 0)
         precondition(bytesLeft >= count)
-        defer { self.offset += count }
-        return self.data[self.offset..<self.offset + count].toArray(type: UInt8.self, count: count)
+        var result = [UInt8]()
+        result.reserveCapacity(count)
+        for _ in 0..<count {
+            result.append(self.ptr[self.offset])
+            self.offset += 1
+        }
+        return result
     }
 
     /**
@@ -80,7 +88,7 @@ public class ByteReader {
         // to use them for `count` == 2, 4 or 8.
         var result = 0
         for i in 0..<count {
-            result += Int(truncatingIfNeeded: self.data[self.offset]) << (8 * i)
+            result += Int(truncatingIfNeeded: self.ptr[self.offset]) << (8 * i)
             self.offset += 1
         }
         return result
@@ -94,7 +102,7 @@ public class ByteReader {
     public func uint64() -> UInt64 {
         precondition(bytesLeft >= 8)
         defer { self.offset += 8 }
-        return self.data[self.offset..<self.offset + 8].to(type: UInt64.self)
+        return self.ptr.advanced(by: self.offset).withMemoryRebound(to: UInt64.self, capacity: 1) { $0.pointee }
     }
 
     /**
@@ -111,7 +119,7 @@ public class ByteReader {
         precondition(bytesLeft >= count)
         var result = 0 as UInt64
         for i in 0..<count {
-            result += UInt64(truncatingIfNeeded: self.data[self.offset]) << (8 * i)
+            result += UInt64(truncatingIfNeeded: self.ptr[self.offset]) << (8 * i)
             self.offset += 1
         }
         return result
@@ -125,7 +133,7 @@ public class ByteReader {
     public func uint32() -> UInt32 {
         precondition(bytesLeft >= 4)
         defer { self.offset += 4 }
-        return self.data[self.offset..<self.offset + 4].to(type: UInt32.self)
+        return self.ptr.advanced(by: self.offset).withMemoryRebound(to: UInt32.self, capacity: 1) { $0.pointee }
     }
 
     /**
@@ -142,7 +150,7 @@ public class ByteReader {
         precondition(bytesLeft >= count)
         var result = 0 as UInt32
         for i in 0..<count {
-            result += UInt32(truncatingIfNeeded: self.data[self.offset]) << (8 * i)
+            result += UInt32(truncatingIfNeeded: self.ptr[self.offset]) << (8 * i)
             self.offset += 1
         }
         return result
@@ -156,7 +164,7 @@ public class ByteReader {
     public func uint16() -> UInt16 {
         precondition(bytesLeft >= 2)
         defer { self.offset += 2 }
-        return self.data[self.offset..<self.offset + 2].to(type: UInt16.self)
+        return self.ptr.advanced(by: self.offset).withMemoryRebound(to: UInt16.self, capacity: 1) { $0.pointee }
     }
 
     /**
@@ -173,7 +181,7 @@ public class ByteReader {
         precondition(bytesLeft >= count)
         var result = 0 as UInt16
         for i in 0..<count {
-            result += UInt16(truncatingIfNeeded: self.data[self.offset]) << (8 * i)
+            result += UInt16(truncatingIfNeeded: self.ptr[self.offset]) << (8 * i)
             self.offset += 1
         }
         return result
